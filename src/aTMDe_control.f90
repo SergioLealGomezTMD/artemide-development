@@ -16,12 +16,12 @@ use EWinput
 use uTMDPDF
 use lpTMDPDF
 use SiversTMDPDF
-use wgtTMDPDF
 use uTMDFF
 use TMDR
 use TMDs
 use TMDF
 use TMDX_DY
+use TMDX_DY_mT
 use TMDX_SIDIS
 use TMDs_inKT
 use aTMDe_Setup
@@ -29,7 +29,7 @@ implicit none
 
 private
 character (len=14),parameter :: moduleName="aTMDe-control"
-character (len=5),parameter :: version="v2.06"
+character (len=5),parameter :: version="v2.05"
 !Last appropriate verion of constants-file
 integer,parameter::inputver=11
 character (len=15),parameter :: constNAME="aTMDe-temporary"
@@ -41,30 +41,30 @@ integer::messageTrigger=5
 logical::isStarted=.false.
 !!!! indicators of modules usage  
 logical::include_EWinput,include_uTMDPDF,include_uTMDFF,include_TMDR,include_TMDs,include_TMDF
-logical::include_lpTMDPDF,include_SiversTMDPDF,include_wgtTMDPDF
-logical::include_TMDX_DY,include_TMDX_SIDIS,include_TMDs_inKT
+logical::include_lpTMDPDF,include_SiversTMDPDF
+logical::include_TMDX_DY,include_TMDX_SIDIS,include_TMDs_inKT,include_TMDX_DY_mT
 
 !!!! legths of non-perturbative arrays
 integer::NPlength_total
-integer::NPlength_TMDR,NPlength_uTMDPDF,NPlength_uTMDFF,NPlength_lpTMDPDF,NPlength_SiversTMDPDF,NPlength_wgtTMDPDF
+integer::NPlength_TMDR,NPlength_uTMDPDF,NPlength_uTMDFF,NPlength_lpTMDPDF,NPlength_SiversTMDPDF
 
 !!!! non-pertrubative parameters for individual modules
-real(dp),allocatable::lambdaNP_TMDR(:),lambdaNP_uTMDPDF(:),lambdaNP_uTMDFF(:),lambdaNP_lpTMDPDF(:),&
-            lambdaNP_SiversTMDPDF(:),lambdaNP_wgtTMDPDF(:)
-
+real(dp),allocatable::lambdaNP_TMDR(:),lambdaNP_uTMDPDF(:),lambdaNP_uTMDFF(:),lambdaNP_lpTMDPDF(:),lambdaNP_SiversTMDPDF(:)
+real(dp),allocatable::lambdaNP_uTMDPDF_f(:,:)
 !!!! Saved values of scale-variation parameters
 real(dp)::c1_saved,c2_saved,c3_saved,c4_saved
 
 public::artemide_Initialize
 public::artemide_SetNPparameters,artemide_SetNPparameters_TMDR,artemide_SetNPparameters_uTMDFF,artemide_SetNPparameters_uTMDPDF
-public::artemide_SetNPparameters_lpTMDPDF,artemide_SetNPparameters_SiversTMDPDF,artemide_SetNPparameters_wgtTMDPDF
+public::artemide_SetNPparameters_lpTMDPDF,artemide_SetNPparameters_SiversTMDPDF,artemide_SetNPparameters_uTMDPDF_f
 public::artemide_SetReplica_TMDR,artemide_SetReplica_uTMDFF,artemide_SetReplica_uTMDPDF
-public::artemide_SetReplica_lpTMDPDF,artemide_SetReplica_SiversTMDPDF,artemide_SetReplica_wgtTMDPDF
+public::artemide_SetReplica_lpTMDPDF,artemide_SetReplica_SiversTMDPDF
 public::artemide_SetScaleVariations
 public::artemide_ShowStatistics
 public::artemide_GetReplicaFromFile,artemide_NumOfReplicasInFile
+public::artemide_SetEWparameters
 
-contains
+ contains
   
 !! Module that creates the constants-file,
 !! and the read it
@@ -225,18 +225,7 @@ subroutine artemide_Initialize(file,prefix,order)
     
     call MoveTO(51,'*13   ')
     call MoveTO(51,'*p1  ')
-    read(51,*) include_wgtTMDPDF
-    call MoveTO(51,'*B   ')
-    call MoveTO(51,'*p1  ')
-    read(51,*) NPlength_wgtTMDPDF
-    !allocate lambda's and read initialization NP-array
-    if(include_wgtTMDPDF) then
-        allocate(lambdaNP_wgtTMDPDF(1:NPlength_wgtTMDPDF))
-        call MoveTO(51,'*p2  ')
-        do i=1,NPlength_wgtTMDPDF
-            read(51,*) lambdaNP_wgtTMDPDF(i)
-        end do
-    end if
+    read(51,*) include_TMDX_DY_mT
 
     CLOSE (51, STATUS='KEEP')
     !-----------------------------------------------------------
@@ -287,14 +276,6 @@ subroutine artemide_Initialize(file,prefix,order)
             call SiversTMDPDF_Initialize(constNAME)
         end if
     end if
-    
-    if(include_wgtTMDPDF) then
-        if(present(prefix)) then
-            call wgtTMDPDF_Initialize(constNAME,prefix)
-        else
-            call wgtTMDPDF_Initialize(constNAME)
-        end if
-    end if
 
     if(include_TMDR) then
         if(present(prefix)) then
@@ -335,6 +316,14 @@ subroutine artemide_Initialize(file,prefix,order)
             call TMDX_DY_Initialize(constNAME)
         end if
     end if
+    
+    if(include_TMDX_DY_mT) then
+        if(present(prefix)) then
+            call TMDX_DY_mT_Initialize(constNAME,prefix)
+        else
+            call TMDX_DY_mT_Initialize(constNAME)
+        end if
+    end if
 
     if(include_TMDX_SIDIS) then
         if(present(prefix)) then
@@ -352,7 +341,6 @@ subroutine artemide_Initialize(file,prefix,order)
     if(include_uTMDFF) NPlength_total=NPlength_total+NPlength_uTMDFF
     if(include_lpTMDPDF) NPlength_total=NPlength_total+NPlength_lpTMDPDF
     if(include_SiversTMDPDF) NPlength_total=NPlength_total+NPlength_SiversTMDPDF
-    if(include_wgtTMDPDF) NPlength_total=NPlength_total+NPlength_wgtTMDPDF
 
     if(outputLevel>2) write(*,*) ' artemide.control: Total number of NP parameters:',NPlength_total
 
@@ -374,10 +362,19 @@ subroutine artemide_Initialize(file,prefix,order)
     if(include_uTMDFF) call artemide_SetNPparameters_uTMDFF(lambdaNP_uTMDFF)
     if(include_lpTMDPDF) call artemide_SetNPparameters_lpTMDPDF(lambdaNP_lpTMDPDF)
     if(include_SiversTMDPDF) call artemide_SetNPparameters_SiversTMDPDF(lambdaNP_SiversTMDPDF)
-    if(include_wgtTMDPDF) call artemide_SetNPparameters_wgtTMDPDF(lambdaNP_wgtTMDPDF)
     if(outputLevel>1) write(*,*) color(' artemide.control: initial NP arrays set.',c_green_bold)
     end if
 end subroutine artemide_Initialize
+
+
+
+  !------------------------------------------------------------- EW parameters ----------------------------
+  
+subroutine artemide_SetEWparameters(M_W,G_W)
+    real*8::M_W,G_W
+    
+    call Set_EWparamters(M_W=M_W,G_W=G_W)
+end subroutine artemide_SetEWparameters
   
   !-------------------------------------------------------------- NP parameters ---------------------------
 subroutine artemide_SetNPparameters(lambdaNP)
@@ -426,10 +423,6 @@ subroutine artemide_SetNPparameters(lambdaNP)
         lambdaNP_SiversTMDPDF=lambda_cur(num+1:num+NPlength_SiversTMDPDF)
         num=num+NPlength_SiversTMDPDF
     end if
-    if(include_wgtTMDPDF) then
-        lambdaNP_wgtTMDPDF=lambda_cur(num+1:num+NPlength_wgtTMDPDF)
-        num=num+NPlength_wgtTMDPDF
-    end if
 
     !!! sending NP arrays to packages
     if(include_TMDR) call TMDR_setNPparameters(lambdaNP_TMDR)
@@ -437,11 +430,11 @@ subroutine artemide_SetNPparameters(lambdaNP)
     if(include_uTMDFF) call uTMDFF_SetLambdaNP(lambdaNP_uTMDFF)
     if(include_lpTMDPDF) call lpTMDPDF_SetLambdaNP(lambdaNP_lpTMDPDF)
     if(include_SiversTMDPDF) call SiversTMDPDF_SetLambdaNP(lambdaNP_SiversTMDPDF)
-    if(include_wgtTMDPDF) call wgtTMDPDF_SetLambdaNP(lambdaNP_wgtTMDPDF)
 
     !!! reseting other packages
     if(include_TMDF) call TMDF_ResetCounters()
     if(include_TMDX_DY) call TMDX_DY_ResetCounters()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ResetCounters()
     if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
 
 end subroutine artemide_SetNPparameters
@@ -485,6 +478,7 @@ subroutine artemide_SetNPparameters_TMDR(lambdaNP)
     !!! reseting other packages
     if(include_TMDF) call TMDF_ResetCounters()
     if(include_TMDX_DY) call TMDX_DY_ResetCounters()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ResetCounters()
     if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
 
 end subroutine artemide_SetNPparameters_TMDR
@@ -529,9 +523,77 @@ subroutine artemide_SetNPparameters_uTMDPDF(lambdaNP)
     !!! reseting other packages
     if(include_TMDF) call TMDF_ResetCounters()
     if(include_TMDX_DY) call TMDX_DY_ResetCounters()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ResetCounters()
     if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
 
 end subroutine artemide_SetNPparameters_uTMDPDF
+
+subroutine artemide_SetNPparameters_uTMDPDF_f(lambdaNP_f)
+    real(dp),intent(in)::lambdaNP_f(:,:)
+    integer::ll,i,lq
+
+    if(.not.include_uTMDPDF) then
+        if(outputLevel>0) &
+            write(*,*) &
+            ErrorString('attempt to set NP-parameters for uTMDPDF, while uTMDPDF module is not included in the current setup',&
+            moduleName)
+        if(outputLevel>0) write(*,*) color('NOTHING IS DONE',c_red)
+        return
+    end if
+
+    ll=size(lambdaNP_f,2)
+    lq=size(lambdaNP_f,1)
+
+
+    if(ll<NPlength_uTMDPDF) then
+        if(outputLevel>0) write(*,"(A,I4,A,I4,A)")&
+            color('artemide.SetNPparameters-uTMDPDF: ERROR: the length of NP parameters array (',c_red),ll,&
+            color(') is smaller then the total number of NP parameters for uTMDPDF (',c_red),NPlength_uTMDPDF,&
+            color(')',c_red)
+        if(outputLevel>0) write(*,*) color('NOTHING IS DONE',c_red)
+        return
+    end if
+
+    if(ll>NPlength_uTMDPDF) then
+        if(outputLevel>0) write(*,"(A,I4,A,I4,A)")&
+            color('artemide.SetNPparameters: ERROR: the length of NP parameters array (',c_red),ll,&
+            color(') is larger then total the number of NP parameters for uTMDPDF (',c_red),NPlength_uTMDPDF,&
+            color(')',c_red)
+        if(outputLevel>0) write(*,*) color('The array is trucated',c_red)
+    end if
+    
+    if (lq-1 /= 10) then
+        if(outputLevel>0) write(*,"(A,I4,A,I4,A)")&
+            color('artemide.SetNPparameters-uTMDPDF: ERROR: the length of NP parameters array (',c_red),ll,&
+            color(') is smaller then the total number of quarks for uTMDPDF (',c_red),10,&
+            color(')',c_red)
+        if(outputLevel>0) write(*,*) color('NOTHING IS DONE',c_red)
+        return
+    end if
+    
+    if (allocated(lambdaNP_uTMDPDF_f)) then
+        deallocate(lambdaNP_uTMDPDF_f)
+        allocate(lambdaNP_uTMDPDF_f(-5:5,1:NPlength_uTMDPDF))
+    else
+        allocate(lambdaNP_uTMDPDF_f(-5:5,1:NPlength_uTMDPDF))
+    end if
+    
+    do i=-5,5
+    lambdaNP_uTMDPDF_f(i,1:NPlength_uTMDPDF)=lambdaNP_f(i+6,1:NPlength_uTMDPDF)
+    end do
+    
+
+    call uTMDPDF_SetLambdaNP_f(lambdaNP_uTMDPDF_f)
+
+    !!! reseting other packages
+    if(include_TMDF) call TMDF_ResetCounters()
+    if(include_TMDX_DY) call TMDX_DY_ResetCounters()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ResetCounters()
+    if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
+
+end subroutine artemide_SetNPparameters_uTMDPDF_f
+
+
   
 subroutine artemide_SetNPparameters_uTMDFF(lambdaNP)
     real(dp),intent(in)::lambdaNP(:)
@@ -572,6 +634,7 @@ subroutine artemide_SetNPparameters_uTMDFF(lambdaNP)
     !!! reseting other packages
     if(include_TMDF) call TMDF_ResetCounters()
     if(include_TMDX_DY) call TMDX_DY_ResetCounters()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ResetCounters()
     if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
 
 end subroutine artemide_SetNPparameters_uTMDFF
@@ -616,6 +679,7 @@ subroutine artemide_SetNPparameters_lpTMDPDF(lambdaNP)
     !!! reseting other packages
     if(include_TMDF) call TMDF_ResetCounters()
     if(include_TMDX_DY) call TMDX_DY_ResetCounters()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ResetCounters()
     if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
 
 end subroutine artemide_SetNPparameters_lpTMDPDF
@@ -659,52 +723,10 @@ subroutine artemide_SetNPparameters_SiversTMDPDF(lambdaNP)
     !!! reseting other packages
     if(include_TMDF) call TMDF_ResetCounters()
     if(include_TMDX_DY) call TMDX_DY_ResetCounters()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ResetCounters()
     if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
 
 end subroutine artemide_SetNPparameters_SiversTMDPDF
-
-subroutine artemide_SetNPparameters_wgtTMDPDF(lambdaNP)
-    real(dp),intent(in)::lambdaNP(:)
-    integer::ll
-
-    if(.not.include_wgtTMDPDF) then
-        if(outputLevel>0) &
-            write(*,*) ErrorString('attempt to set NP-parameters for wgtTMDPDF, &
-        while wgtTMDPDF module is not included in the current setup',moduleName)
-        if(outputLevel>0) write(*,*) color('NOTHING IS DONE',c_red)
-        return
-    end if
-
-    ll=size(lambdaNP)
-
-
-    if(ll<NPlength_wgtTMDPDF) then
-        if(outputLevel>0) write(*,"(A,I4,A,I4,A)")&
-            color('artemide.SetNPparameters-wgtTMDPDF: ERROR: the length of NP parameters array (',c_red),ll,&
-            color(') is smaller then the total number of NP parameters for wgtTMDPDF (',c_red),NPlength_wgtTMDPDF,&
-            color(')',c_red)
-        if(outputLevel>0) write(*,*) color('NOTHING IS DONE',c_red)
-        return
-    end if
-
-    if(ll>NPlength_wgtTMDPDF) then
-        if(outputLevel>0) write(*,"(A,I4,A,I4,A)")&
-            color('artemide.SetNPparameters: ERROR: the length of NP parameters array (',c_red),ll,&
-            color(') is larger then total the number of NP parameters for wgtTMDPDF (',c_red),NPlength_wgtTMDPDF,&
-            color(')',c_red)
-        if(outputLevel>0) write(*,*) color('The array is trucated',c_red)
-    end if
-
-    lambdaNP_wgtTMDPDF=lambdaNP(1:NPlength_wgtTMDPDF)
-
-    call wgtTMDPDF_SetLambdaNP(lambdaNP_wgtTMDPDF)
-
-    !!! reseting other packages
-    if(include_TMDF) call TMDF_ResetCounters()
-    if(include_TMDX_DY) call TMDX_DY_ResetCounters()
-    if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
-
-end subroutine artemide_SetNPparameters_wgtTMDPDF
  
 subroutine artemide_SetReplica_TMDR(num)
     integer,intent(in)::num
@@ -723,6 +745,7 @@ subroutine artemide_SetReplica_TMDR(num)
     !!! reseting other packages
     if(include_TMDF) call TMDF_ResetCounters()
     if(include_TMDX_DY) call TMDX_DY_ResetCounters()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ResetCounters()
     if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
 
 end subroutine artemide_SetReplica_TMDR
@@ -744,6 +767,7 @@ subroutine artemide_SetReplica_uTMDPDF(num)
     !!! reseting other packages
     if(include_TMDF) call TMDF_ResetCounters()
     if(include_TMDX_DY) call TMDX_DY_ResetCounters()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ResetCounters()
     if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
 
 end subroutine artemide_SetReplica_uTMDPDF
@@ -765,6 +789,7 @@ subroutine artemide_SetReplica_uTMDFF(num)
     !!! reseting other packages
     if(include_TMDF) call TMDF_ResetCounters()
     if(include_TMDX_DY) call TMDX_DY_ResetCounters()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ResetCounters()
     if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
 
 end subroutine artemide_SetReplica_uTMDFF
@@ -786,6 +811,7 @@ subroutine artemide_SetReplica_lpTMDPDF(num)
     !!! reseting other packages
     if(include_TMDF) call TMDF_ResetCounters()
     if(include_TMDX_DY) call TMDX_DY_ResetCounters()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ResetCounters()
     if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
 
 end subroutine artemide_SetReplica_lpTMDPDF
@@ -807,30 +833,10 @@ subroutine artemide_SetReplica_SiversTMDPDF(num)
     !!! reseting other packages
     if(include_TMDF) call TMDF_ResetCounters()
     if(include_TMDX_DY) call TMDX_DY_ResetCounters()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ResetCounters()
     if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
 
 end subroutine artemide_SetReplica_SiversTMDPDF
-
-subroutine artemide_SetReplica_wgtTMDPDF(num)
-    integer,intent(in)::num
-
-    if(.not.include_wgtTMDPDF) then
-        if(outputLevel>0) &
-        write(*,*) ErrorString('attempt to set a replica for wgtTMDPDF,&
-            while wgtTMDPDF module is not included in the current setup',ModuleName)
-        if(outputLevel>0) write(*,*) 'NOTHING IS DONE'
-        return
-    end if
-
-    call wgtTMDPDF_SetLambdaNP(num)
-    call wgtTMDPDF_CurrentNPparameters(lambdaNP_wgtTMDPDF)
-
-    !!! reseting other packages
-    if(include_TMDF) call TMDF_ResetCounters()
-    if(include_TMDX_DY) call TMDX_DY_ResetCounters()
-    if(include_TMDX_SIDIS) call TMDX_SIDIS_ResetCounters()
-
-end subroutine artemide_SetReplica_wgtTMDPDF
   
 !------------------------------------------------------- Other routines ---------------------------------
 subroutine artemide_ShowStatistics()
@@ -866,22 +872,15 @@ subroutine artemide_ShowStatistics()
         write(*,*) ' '
     end if
     if(include_SiversTMDPDF) then
-        write(*,"('--- SiversTMDPDF : ',I3,' parameters')") NPlength_SiversTMDPDF
+        write(*,"('--- SiversTMDPDF : ',I3,' parameters')") NPlength_lpTMDPDF
         do i=1,NPlength_SiversTMDPDF
             write(*,"(F10.4,' ')",advance='no') lambdaNP_SiversTMDPDF(i)
         end do
         write(*,*) ' '
     end if
-    if(include_wgtTMDPDF) then
-        write(*,"('--- wgtTMDPDF : ',I3,' parameters')") NPlength_wgtTMDPDF
-        do i=1,NPlength_wgtTMDPDF
-            write(*,"(F10.4,' ')",advance='no') lambdaNP_wgtTMDPDF(i)
-        end do
-        write(*,*) ' '
-    end if
-    
     if(include_TMDF) call TMDF_ShowStatistic()
     if(include_TMDX_DY) call TMDX_DY_ShowStatistic()
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_ShowStatistic()
     if(include_TMDX_SIDIS) call TMDX_SIDIS_ShowStatistic()
 
 
@@ -897,9 +896,9 @@ subroutine artemide_SetScaleVariations(c1,c2,c3,c4)
     if(include_uTMDFF) call uTMDFF_SetScaleVariation(c4)
     if(include_lpTMDPDF) call lpTMDPDF_SetScaleVariation(c4)
     if(include_SiversTMDPDF) call SiversTMDPDF_SetScaleVariation(c4)
-    if(include_wgtTMDPDF) call wgtTMDPDF_SetScaleVariation(c4)
     if(include_TMDs) call TMDs_SetScaleVariations(c1,c3)
     if(include_TMDX_DY) call TMDX_DY_SetScaleVariation(c2)
+    if(include_TMDX_DY_mT) call TMDX_DY_mT_SetScaleVariation(c2)
     if(include_TMDX_SIDIS) call TMDX_SIDIS_SetScaleVariation(c2)
 
 end subroutine artemide_SetScaleVariations
@@ -947,14 +946,6 @@ function BaseNPString()
         BaseNPString(j)=1d0
         j=j+1
         do i=1,NPlength_SiversTMDPDF
-            BaseNPString(j)=0d0
-            j=j+1
-        end do
-    end if
-    if(include_wgtTMDPDF) then
-        BaseNPString(j)=1d0
-        j=j+1
-        do i=1,NPlength_wgtTMDPDF
             BaseNPString(j)=0d0
             j=j+1
         end do
@@ -1010,7 +1001,7 @@ subroutine artemide_GetReplicaFromFile(file,rep,repString)
             end if
         end if
 
-        if(include_uTMDPDF) then                    
+        if(include_uTMDPDF) then
             call MoveTO(51,'*4   ')
             read(51,*) k1,k2
             if(k2-k1+1/=NPlength_uTMDPDF) then
@@ -1042,15 +1033,6 @@ subroutine artemide_GetReplicaFromFile(file,rep,repString)
             read(51,*) k1,k2
             if(k2-k1+1/=NPlength_SiversTMDPDF) then
                 write(*,*) ERRORstring('number of NP parameters in replica-file does not match the SiversTMDPDF model',moduleName)
-                stop
-            end if
-        end if
-        
-        if(ver>=19 .and. include_wgtTMDPDF) then
-            call MoveTO(51,'*13   ')
-            read(51,*) k1,k2
-            if(k2-k1+1/=NPlength_wgtTMDPDF) then
-                write(*,*) ERRORstring('number of NP parameters in replica-file does not match the wgtTMDPDF model',moduleName)
                 stop
             end if
         end if
