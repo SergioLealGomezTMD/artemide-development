@@ -10,15 +10,17 @@ module harpy
 use TMDs
 use TMDs_inKT
 use TMDX_DY
+use TMDX_DY_mT
 use TMDX_SIDIS
 use aTMDe_control
 use uTMDPDF
 use TMDR_model
+use TMDF
 
 !!! this flag is requared to guaranty that artemide is not started twice (it lead to the crush)
 logical::started=.false.
 
-contains
+ contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!GENERAL
   subroutine Initialize(file)
@@ -66,11 +68,11 @@ contains
   call artemide_SetReplica_SiversTMDPDF(num)
   end subroutine SetReplica_SiversTMDPDF
   
-    !!
-  subroutine SetReplica_wgtTMDPDF(num)
-  integer:: num
-  call artemide_SetReplica_wgtTMDPDF(num)
-  end subroutine SetReplica_wgtTMDPDF
+  !!!It sets the W mass and decay width
+  subroutine SetEWparameters_Main(EWparm)
+  real*8,intent(in)::EWparm(:)
+  call artemide_SetEWparameters(M_W=EWparm(1),G_W=EWparm(2))
+  end subroutine SetEWparameters_Main
   
   
   !!!Sets the non-pertrubative parameters lambda
@@ -85,11 +87,32 @@ contains
     call artemide_SetNPparameters_TMDR(lambdaIN)
   end subroutine SetLambda_TMDR
   
-      !!!Sets the non-pertrubative parameters lambda
-  subroutine SetLambda_uTMDPDF(lambdaIN)
+       !!!Sets the non-pertrubative parameters lambda
+   subroutine SetLambda_uTMDPDF(lambdaIN)
+     real*8,intent(in)::lambdaIN(:)
+     call artemide_SetNPparameters_uTMDPDF(lambdaIN)
+   end subroutine SetLambda_uTMDPDF
+  
+      !!!Sets the non-pertrubative parameters lambda flavour dependent
+  subroutine SetLambda_uTMDPDF_f(lambdaIN)
     real*8,intent(in)::lambdaIN(:)
-    call artemide_SetNPparameters_uTMDPDF(lambdaIN)
-  end subroutine SetLambda_uTMDPDF
+    real*8,dimension(:,:),allocatable::lambdaIN_f
+    integer::i,j
+    
+    if (allocated(lambdaIN_f)) then
+        deallocate(lambdaIN_f)
+    end if
+    
+    allocate(lambdaIN_f(-5:5,1:size(lambdaIN,1)/11))
+    
+    do i=1,11
+        do j=1,size(lambdaIN,1)/11
+        lambdaIN_f(i-6,j)=lambdaIN(11*(j-1)+i)
+        end do
+    end do
+
+    call artemide_SetNPparameters_uTMDPDF_f(lambdaIN_f)
+  end subroutine SetLambda_uTMDPDF_f
   
   !!!Sets the non-pertrubative parameters lambda
   subroutine SetLambda_uTMDFF(lambdaIN)
@@ -108,12 +131,6 @@ contains
     real*8,intent(in)::lambdaIN(:)
     call artemide_SetNPparameters_SiversTMDPDF(lambdaIN)
   end subroutine SetLambda_SiversTMDPDF
-  
-    !!!Sets the non-pertrubative parameters lambda
-  subroutine SetLambda_wgtTMDPDF(lambdaIN)
-    real*8,intent(in)::lambdaIN(:)
-    call artemide_SetNPparameters_wgtTMDPDF(lambdaIN)
-  end subroutine SetLambda_wgtTMDPDF
   
   
   !!!! this routine set the variations of scales
@@ -298,50 +315,6 @@ contains
     
   end function lpTMDPDF_50_Optimal
   
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!wgtTMDPDF
-  !!!!!!!! wgt TMDFF
-  ! vector (bbar,cbar,sbar,ubar,dbar,??,d,u,s,c,b)
-  function wgtTMDPDF_5_Evolved(x,bt,muf,zetaf,hadron)
-    real*8:: wgtTMDPDF_5_Evolved(-5:5)
-    real*8:: x,bt,muf,zetaf
-    integer::hadron
-  
-  wgtTMDPDF_5_Evolved=wgtTMDPDF_5(x,bt,muf,zetaf,hadron)
-    
-  end function wgtTMDPDF_5_Evolved
-  
-    ! vector (bbar,cbar,sbar,ubar,dbar,g,d,u,s,c,b)
-  function wgtTMDPDF_50_Evolved(x,bt,muf,zetaf,hadron)
-    real*8:: wgtTMDPDF_50_Evolved(-5:5)
-    real*8:: x,bt,muf,zetaf
-    integer::hadron
-  
-  wgtTMDPDF_50_Evolved=wgtTMDPDF_50(x,bt,muf,zetaf,hadron)
-    
-  end function wgtTMDPDF_50_Evolved
-
-    !!!!!!!! wgt TMDPDF
-  ! vector (bbar,cbar,sbar,ubar,dbar,??,d,u,s,c,b)
-  function wgtTMDPDF_5_Optimal(x,bt,hadron)
-    real*8:: wgtTMDPDF_5_Optimal(-5:5)
-    real*8:: x,bt
-    integer::hadron
-  
-  wgtTMDPDF_5_Optimal=wgtTMDPDF_5(x,bt,hadron)
-    
-  end function wgtTMDPDF_5_Optimal
-  
-    ! vector (bbar,cbar,sbar,ubar,dbar,g,d,u,s,c,b)
-  function wgtTMDPDF_50_Optimal(x,bt,hadron)
-    real*8:: wgtTMDPDF_50_Optimal(-5:5)
-    real*8:: x,bt
-    integer::hadron
-  
-  wgtTMDPDF_50_Optimal=wgtTMDPDF_50(x,bt,hadron)
-    
-  end function wgtTMDPDF_50_Optimal
-  
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TMDs IN KT
@@ -494,48 +467,6 @@ contains
     
   end function SiversTMDPDF_kT_50_Optimal
   
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !!!!!!!!! wgt TMDPDF
-  ! vector (bbar,cbar,sbar,ubar,dbar,??,d,u,s,c,b)
-  function wgtTMDPDF_kT_5_Evolved(x,bt,muf,zetaf,hadron)
-    real*8:: wgtTMDPDF_kT_5_Evolved(-5:5)
-    real*8:: x,bt,muf,zetaf
-    integer::hadron
-  
-  wgtTMDPDF_kT_5_Evolved=wgtTMDPDF_kT_5(x,bt,muf,zetaf,hadron)
-    
-  end function wgtTMDPDF_kT_5_Evolved
-  
-    ! vector (bbar,cbar,sbar,ubar,dbar,g,d,u,s,c,b)
-  function wgtTMDPDF_kT_50_Evolved(x,bt,muf,zetaf,hadron)
-    real*8:: wgtTMDPDF_kT_50_Evolved(-5:5)
-    real*8:: x,bt,muf,zetaf
-    integer::hadron
-  
-  wgtTMDPDF_kT_50_Evolved=wgtTMDPDF_kT_5(x,bt,muf,zetaf,hadron)
-    
-  end function wgtTMDPDF_kT_50_Evolved
-
-  ! vector (bbar,cbar,sbar,ubar,dbar,??,d,u,s,c,b)
-  function wgtTMDPDF_kT_5_Optimal(x,bt,hadron)
-    real*8:: wgtTMDPDF_kT_5_Optimal(-5:5)
-    real*8:: x,bt
-    integer::hadron
-  
-  wgtTMDPDF_kT_5_Optimal=wgtTMDPDF_kT_5(x,bt,hadron)
-    
-  end function wgtTMDPDF_kT_5_Optimal
-  
-    ! vector (bbar,cbar,sbar,ubar,dbar,g,d,u,s,c,b)
-  function wgtTMDPDF_kT_50_Optimal(x,bt,hadron)
-    real*8:: wgtTMDPDF_kT_50_Optimal(-5:5)
-    real*8:: x,bt
-    integer::hadron
-  
-  wgtTMDPDF_kT_50_Optimal=wgtTMDPDF_kT_5(x,bt,hadron)
-    
-  end function wgtTMDPDF_kT_50_Optimal
-  
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -584,10 +515,58 @@ contains
     logical,intent(in),dimension(:)::includeCuts		!include cuts
     real*8,intent(in),dimension(:,:)::CutParameters	!(p1,p2,eta1,eta2)
     real*8,dimension(1:ListLength)::DY_xSec_List
+    real*8,dimension(1:ListLength)::DY_xSec_List_test
+    integer::i
     
-    call xSec_DY_List(DY_xSec_List,process,s,qT,Q,y,includeCuts,CutParameters)
+    call xSec_DY_List(DY_xSec_List_test,process,s,qT,Q,y,includeCuts,CutParameters)
+    if (TMDF_IsconvergenceLost()) then
+       do i=1,ListLength
+       DY_xSec_List(i)=1d9
+       end do
+    else
+       do i=1,ListLength
+       DY_xSec_List(i)=DY_xSec_List_test(i)
+       end do
+    end if
   
   end function DY_xSec_List
+  
+  function DY_xSec_mT_List(process,s,qT,Q,y,mT,includeCuts,CutParameters,ListLength)
+    integer,intent(in)::ListLength
+    integer,intent(in),dimension(:,:)::process			!the number of process
+    real*8,intent(in),dimension(:)::s				!Mandelshtam s
+    real*8,intent(in),dimension(:,:)::qT			!(qtMin,qtMax)
+    real*8,intent(in),dimension(:,:)::Q				!(Qmin,Qmax)
+    real*8,intent(in),dimension(:,:)::y				!(ymin,ymax)
+    real*8,intent(in),dimension(:,:)::mT				!(ymin,ymax)
+    logical,intent(in),dimension(:)::includeCuts		!include cuts
+    real*8,intent(in),dimension(:,:)::CutParameters	!(p1,p2,eta1,eta2)
+    real*8,dimension(1:ListLength)::DY_xSec_mT_List
+    integer,dimension(1:ListLength)::n
+    integer::i,NQ
+    real*8::deltaQ
+    
+    deltaQ=Q(1,2)-Q(1,1)
+    
+    do i=1,ListLength
+        if ((qT(i,2)-qT(i,1)-int(qT(i,2)-qT(i,1)))>0d0) then
+           n(i)=4*int(qT(i,2)-qT(i,1)+1d0)
+        else
+           n(i)=4*int(qT(i,2)-qT(i,1))
+        end if
+    end do
+    
+    if (deltaQ>60d0.and.deltaQ<=120d0) then
+        NQ=8
+    else if (deltaQ>120d0) then
+        NQ=16
+    else
+        NQ=4
+    end if
+    
+    call xSec_DY_mT_List(DY_xSec_mT_List,process,s,qT,Q,y,mT,includeCuts,CutParameters,n,NQ)
+  
+  end function DY_xSec_mT_List
   
   function DY_xSec_BINLESS_List(process,s,qT,Q,y,includeCuts,CutParameters,ListLength)
     integer,intent(in)::ListLength
